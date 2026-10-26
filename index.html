@@ -54,7 +54,7 @@
       font-family: monospace;
     }
     #joinInput:focus { border-color: #e8c89a; }
-    #joinError { color: #ff6666; font-size: 12px; margin-top: 10px; display: none; height: 15px; }
+    #joinError { color: #ff6666; font-size: 14px; margin-top: 15px; display: none; height: 20px; }
 
     /* --- LIMITE DE JOGADORES --- */
     #host-options { margin-bottom: 20px; font-size: 14px; color: #e8c89a; }
@@ -146,7 +146,7 @@
         </div>
         <p>Compartilhe este código:</p>
         <div id="roomCodeDisplay">------</div>
-        <p style="font-size:11px; color:#e8c89a;" id="hostStatus">Aguardando jogadores...</p>
+        <p style="font-size:14px; color:#e8c89a; font-weight:bold;" id="hostStatus">Aguardando (1/2)...</p>
       </div>
       <div id="join-ui" style="display:none">
         <p>Digite o código da sala:</p>
@@ -420,50 +420,31 @@
     let peer = null;
     let isMultiplayer = false;
     let myId = null;
-    let myColor = 0x4a9eff; // Cor padrão (Azul)
+    let myColor = 0x4a9eff; 
     
-    // Estrutura para armazenar jogadores remotos
-    // map: { peerId: { color, mesh, targetPos, targetYaw, light } }
     const remotePlayers = new Map();
-    
-    // Variáveis de Host
-    let hostConnections = new Map(); // peerId -> DataConnection
+    let hostConnections = new Map();
     let maxPlayers = 4;
 
     function createPlayerMesh(colorHex) {
       const group = new THREE.Group();
-      
-      const mat = new THREE.MeshStandardMaterial({ 
-        color: colorHex, emissive: colorHex, emissiveIntensity: 0.4, roughness: 0.5 
-      });
-      
+      const mat = new THREE.MeshStandardMaterial({ color: colorHex, emissive: colorHex, emissiveIntensity: 0.4, roughness: 0.5 });
       const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.2, 8), mat);
       body.position.y = 0.6; group.add(body);
-      
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), mat);
       head.position.y = 1.45; group.add(head);
-      
       const light = new THREE.SpotLight(colorHex, 15, 20, Math.PI/5, 0.5, 1.5);
       light.position.set(0, 1.4, 0); light.target.position.set(0, 0, -1);
       group.add(light); group.add(light.target);
-      
       group.visible = false;
       return { group, light };
     }
 
     function addRemotePlayer(id, colorHex, x, z, yaw) {
       if (remotePlayers.has(id)) removeRemotePlayer(id);
-      
       const { group, light } = createPlayerMesh(colorHex);
       scene.add(group);
-      
-      remotePlayers.set(id, {
-        color: colorHex,
-        mesh: group,
-        light: light,
-        targetPos: new THREE.Vector3(x, 0, z),
-        targetYaw: yaw
-      });
+      remotePlayers.set(id, { color: colorHex, mesh: group, light: light, targetPos: new THREE.Vector3(x, 0, z), targetYaw: yaw });
     }
 
     function removeRemotePlayer(id) {
@@ -477,77 +458,45 @@
     // ============ MINIMAP ============
     const minimapCanvas = document.getElementById('minimap');
     const mapCtx = minimapCanvas.getContext('2d');
-    const MAP_SIZE = 150;
-    const MAP_RADIUS = MAP_SIZE / 2;
-    const MAP_VIEW_RANGE = 100;
-    const MAP_SCALE = MAP_RADIUS / MAP_VIEW_RANGE;
+    const MAP_SIZE = 150, MAP_RADIUS = MAP_SIZE / 2, MAP_VIEW_RANGE = 100, MAP_SCALE = MAP_RADIUS / MAP_VIEW_RANGE;
 
     function drawMinimap() {
       if (!started) return;
       mapCtx.clearRect(0, 0, MAP_SIZE, MAP_SIZE);
-      
       mapCtx.save();
-      mapCtx.beginPath();
-      mapCtx.arc(MAP_RADIUS, MAP_RADIUS, MAP_RADIUS, 0, Math.PI * 2);
-      mapCtx.clip();
-      mapCtx.fillStyle = 'rgba(10, 8, 12, 0.7)';
-      mapCtx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
+      mapCtx.beginPath(); mapCtx.arc(MAP_RADIUS, MAP_RADIUS, MAP_RADIUS, 0, Math.PI * 2); mapCtx.clip();
+      mapCtx.fillStyle = 'rgba(10, 8, 12, 0.7)'; mapCtx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
 
-      const px = camera.position.x;
-      const pz = camera.position.z;
-
-      // Casas
-      const baseX = Math.round(px / SPACING);
-      const baseZ = Math.round(pz / SPACING);
+      const px = camera.position.x, pz = camera.position.z;
+      const baseX = Math.round(px / SPACING), baseZ = Math.round(pz / SPACING);
       mapCtx.fillStyle = 'rgba(232, 200, 154, 0.15)';
       for (let ix = -5; ix <= 5; ix++) {
         for (let iz = -5; iz <= 5; iz++) {
-          const hx = (baseX + ix) * SPACING;
-          const hz = (baseZ + iz) * SPACING;
-          const sx = MAP_RADIUS + (hx - px) * MAP_SCALE;
-          const sz = MAP_RADIUS + (hz - pz) * MAP_SCALE;
+          const hx = (baseX + ix) * SPACING, hz = (baseZ + iz) * SPACING;
+          const sx = MAP_RADIUS + (hx - px) * MAP_SCALE, sz = MAP_RADIUS + (hz - pz) * MAP_SCALE;
           mapCtx.fillRect(sx - 3, sz - 4, 6, 8);
         }
       }
 
-      // Outros Jogadores
       remotePlayers.forEach((p) => {
-        const rx = p.targetPos.x;
-        const rz = p.targetPos.z;
-        
-        let sx = MAP_RADIUS + (rx - px) * MAP_SCALE;
-        let sz = MAP_RADIUS + (rz - pz) * MAP_SCALE;
-        
+        const rx = p.targetPos.x, rz = p.targetPos.z;
+        let sx = MAP_RADIUS + (rx - px) * MAP_SCALE, sz = MAP_RADIUS + (rz - pz) * MAP_SCALE;
         const dist = Math.hypot(sx - MAP_RADIUS, sz - MAP_RADIUS);
         let isClamped = false;
-        
         if (dist > MAP_RADIUS - 6) {
           const angle = Math.atan2(sz - MAP_RADIUS, sx - MAP_RADIUS);
-          sx = MAP_RADIUS + Math.cos(angle) * (MAP_RADIUS - 6);
-          sz = MAP_RADIUS + Math.sin(angle) * (MAP_RADIUS - 6);
+          sx = MAP_RADIUS + Math.cos(angle) * (MAP_RADIUS - 6); sz = MAP_RADIUS + Math.sin(angle) * (MAP_RADIUS - 6);
           isClamped = true;
         }
-
-        // Desenha o ponto com a cor do jogador
-        mapCtx.beginPath();
-        mapCtx.arc(sx, sz, isClamped ? 3 : 4, 0, Math.PI * 2);
-        mapCtx.fillStyle = '#' + p.color.toString(16).padStart(6, '0');
-        mapCtx.fill();
-        mapCtx.strokeStyle = '#ffffff';
-        mapCtx.lineWidth = 1;
-        mapCtx.stroke();
+        mapCtx.beginPath(); mapCtx.arc(sx, sz, isClamped ? 3 : 4, 0, Math.PI * 2);
+        mapCtx.fillStyle = '#' + p.color.toString(16).padStart(6, '0'); mapCtx.fill();
+        mapCtx.strokeStyle = '#ffffff'; mapCtx.lineWidth = 1; mapCtx.stroke();
       });
 
-      // Jogador Local (Centro)
-      mapCtx.translate(MAP_RADIUS, MAP_RADIUS);
-      mapCtx.rotate(-yaw);
-      mapCtx.beginPath();
-      mapCtx.moveTo(0, -6); mapCtx.lineTo(4, 4); mapCtx.lineTo(-4, 4);
-      mapCtx.closePath();
-      mapCtx.fillStyle = '#' + myColor.toString(16).padStart(6, '0');
-      mapCtx.fill();
-      mapCtx.strokeStyle = '#fff';
-      mapCtx.stroke();
+      mapCtx.translate(MAP_RADIUS, MAP_RADIUS); mapCtx.rotate(-yaw);
+      mapCtx.beginPath(); mapCtx.moveTo(0, -6); mapCtx.lineTo(4, 4); mapCtx.lineTo(-4, 4); mapCtx.closePath();
+      mapCtx.fillStyle = '#' + myColor.toString(16).padStart(6, '0'); mapCtx.fill();
+      mapCtx.strokeStyle = '#fff'; mapCtx.stroke();
       mapCtx.restore();
     }
 
@@ -568,6 +517,13 @@
       return code;
     }
 
+    function startGameForAll() {
+      isMultiplayer = true;
+      document.getElementById('overlay').style.display = 'none';
+      if (!started) requestStart();
+      hostConnections.forEach(conn => { conn.send({ type: 'game-start' }); });
+    }
+
     // --- HOST LOGIC ---
     function initHost() {
       maxPlayers = parseInt(document.getElementById('maxPlayersSelect').value);
@@ -578,32 +534,42 @@
         myId = id;
         roomCodeDisplay.textContent = id;
         hostUI.style.display = 'block';
+        hostStatus.textContent = `Aguardando jogadores (1/${maxPlayers})...`;
+        hostStatus.style.color = '#e8c89a';
         statusEl.textContent = `Hospedando: ${id} (1/${maxPlayers})`;
         statusEl.style.color = '#4aff8a';
       });
 
       peer.on('error', (err) => {
-        if (err.type === 'unavailable-id') {
-          peer.destroy();
-          initHost();
-        }
+        if (err.type === 'unavailable-id') { peer.destroy(); initHost(); }
       });
 
       peer.on('connection', (c) => {
+        // Verifica se a sala já está cheia antes de aceitar
         if (hostConnections.size + 1 >= maxPlayers) {
-          // Sala cheia
           c.on('open', () => { c.send({ type: 'error', msg: 'Sala cheia' }); setTimeout(() => c.close(), 100); });
           return;
         }
 
         hostConnections.set(c.peer, c);
-        hostStatus.textContent = `Jogadores: ${hostConnections.size + 1}/${maxPlayers}`;
-        statusEl.textContent = `Hospedando: ${myId} (${hostConnections.size + 1}/${maxPlayers})`;
+        
+        // Atualiza a UI do Host
+        const total = hostConnections.size + 1;
+        hostStatus.textContent = `Aguardando jogadores (${total}/${maxPlayers})...`;
+        statusEl.textContent = `Hospedando: ${myId} (${total}/${maxPlayers})`;
+
+        c.on('open', () => {
+          // Quando o jogador conecta de fato, verifica se bateu o limite
+          if (hostConnections.size + 1 === maxPlayers) {
+            hostStatus.textContent = `Sala cheia! Iniciando...`;
+            hostStatus.style.color = '#4aff8a';
+            setTimeout(startGameForAll, 1200); // Pequeno delay para leitura
+          }
+        });
 
         c.on('data', (data) => {
           if (data.type === 'join') {
             addRemotePlayer(c.peer, data.color, data.x, data.z, data.yaw);
-            // Manda o estado atual de todo mundo pro novato
             const roster = [];
             roster.push({ id: myId, color: myColor, x: camera.position.x, z: camera.position.z, yaw: yaw });
             hostConnections.forEach((conn, id) => {
@@ -614,7 +580,6 @@
             });
             c.send({ type: 'roster', players: roster });
             
-            // Avisa todo mundo que o novato entrou
             hostConnections.forEach((conn, id) => {
               if (id !== c.peer) conn.send({ type: 'player-joined', id: c.peer, color: data.color, x: data.x, z: data.z, yaw: data.yaw });
             });
@@ -625,7 +590,6 @@
               p.targetPos.set(data.x, 0, data.z);
               p.targetYaw = data.yaw;
             }
-            // Retransmite para os outros
             hostConnections.forEach((conn, id) => {
               if (id !== c.peer) conn.send({ type: 'state', id: c.peer, x: data.x, z: data.z, yaw: data.yaw });
             });
@@ -635,8 +599,10 @@
         c.on('close', () => {
           hostConnections.delete(c.peer);
           removeRemotePlayer(c.peer);
-          hostStatus.textContent = `Jogadores: ${hostConnections.size + 1}/${maxPlayers}`;
-          statusEl.textContent = `Hospedando: ${myId} (${hostConnections.size + 1}/${maxPlayers})`;
+          const totalNow = hostConnections.size + 1;
+          hostStatus.textContent = `Aguardando jogadores (${totalNow}/${maxPlayers})...`;
+          hostStatus.style.color = '#e8c89a';
+          statusEl.textContent = `Hospedando: ${myId} (${totalNow}/${maxPlayers})`;
           hostConnections.forEach(conn => conn.send({ type: 'player-left', id: c.peer }));
         });
       });
@@ -664,15 +630,18 @@
           }
 
           if (data.type === 'roster') {
-            // Recebeu a lista de todos
-            data.players.forEach(p => {
-              if (p.id !== myId) addRemotePlayer(p.id, p.color, p.x, p.z, p.yaw);
-            });
+            data.players.forEach(p => { if (p.id !== myId) addRemotePlayer(p.id, p.color, p.x, p.z, p.yaw); });
             isMultiplayer = true;
+            // Cliente fica no lobby aguardando o Host
+            document.getElementById('btnJoinConnect').style.display = 'none';
+            joinInput.disabled = true;
+            joinError.style.display = 'block';
+            joinError.style.color = '#e8c89a';
+            joinError.textContent = 'Conectado! Aguardando o host iniciar...';
+          }
+          else if (data.type === 'game-start') {
             document.getElementById('overlay').style.display = 'none';
             if (!started) requestStart();
-            statusEl.textContent = 'Conectado';
-            statusEl.style.color = '#4aff8a';
           }
           else if (data.type === 'player-joined') {
             addRemotePlayer(data.id, data.color, data.x, data.z, data.yaw);
@@ -700,6 +669,7 @@
       peer.on('error', (err) => {
         joinInput.disabled = false;
         joinError.style.display = 'block';
+        joinError.style.color = '#ff6666';
         joinError.textContent = 'Sala não encontrada.';
       });
     }
@@ -875,12 +845,10 @@
           
           if (isMultiplayer) {
             if (myId === peer?.id && hostConnections.size > 0) {
-              // Sou Host
               hostConnections.forEach(c => {
                 if (c.open) c.send({ type: 'state', id: myId, x: camera.position.x, z: camera.position.z, yaw: yaw });
               });
             } else if (peer) {
-              // Sou Client
               const conn = peer.connections[Object.keys(peer.connections)[0]]?.[0];
               if (conn && conn.open) conn.send({ type: 'state', x: camera.position.x, z: camera.position.z, yaw: yaw });
             }
