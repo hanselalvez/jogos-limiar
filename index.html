@@ -1,880 +1,610 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-  <title>Liminal — Condomínio Online</title>
-  <style>
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; touch-action: none; }
-    canvas { display: block; touch-action: none; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Liminal — Labirinto</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; touch-action: none; font-family: system-ui, sans-serif; }
+  canvas { display: block; touch-action: none; }
 
-    #vignette {
-      
-      position: fixed; inset: 0; pointer-events: none; z-index: 5;
-      background: radial-gradient(ellipse at center, transparent 45%, rgba(20,10,5,.55) 100%);
-    }
+  #overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    background: #000; color: #ddd; text-align: center; padding: 20px;
+  }
+  #overlay h1 { font-size: 36px; font-weight: 200; letter-spacing: 14px; margin: 0 0 8px; color: #fff; text-transform: uppercase; }
+  #overlay p { opacity: .55; margin: 0 0 28px; font-size: 12px; letter-spacing: 3px; }
+  .menu-btn {
+    background: transparent; border: 1px solid #444; color: #ccc;
+    padding: 12px 32px; font-size: 13px; letter-spacing: 3px; cursor: pointer;
+    text-transform: uppercase; transition: all .2s;
+  }
+  .menu-btn:hover { background: #fff; color: #000; border-color: #fff; }
 
-    #overlay {
-      position: fixed; inset: 0; z-index: 10;
-      display: flex; align-items: center; justify-content: center; flex-direction: column;
-      background: radial-gradient(ellipse at center, rgba(20,15,20,.85) 0%, rgba(10,8,12,.96) 100%);
-      font: 16px/1.6 system-ui, sans-serif; color: #ccc; text-align: center;
-      padding: 20px;
-    }
-    #overlay h1 {
-      font-size: 38px; font-weight: 200; letter-spacing: 14px;
-      margin: 0 0 10px; color: #e8c89a; text-transform: uppercase;
-    }
-    #overlay p { opacity: 0.6; margin: 0 0 20px; font-size: 13px; letter-spacing: 2px; }
-    
-    .menu-btn {
-      background: transparent; border: 1px solid rgba(255,255,255,.2); color: #ccc;
-      padding: 12px 30px; font-size: 14px; letter-spacing: 2px; cursor: pointer;
-      transition: all .2s; margin: 5px; text-transform: uppercase;
-    }
-    .menu-btn:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.5); color: #fff; }
+  #hud {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 8; color: #fff; font-size: 11px; letter-spacing: 6px; text-transform: uppercase;
+    opacity: 0; transition: opacity 1.5s; pointer-events: none; text-align: center;
+  }
+  #hud.visible { opacity: .6; }
+  #dist { font-family: monospace; letter-spacing: 2px; font-size: 10px; color: #888; margin-top: 6px; }
 
-    /* --- SELETOR DE COR --- */
-    #color-picker {
-      display: flex; gap: 15px; margin-bottom: 25px; justify-content: center;
-    }
-    .color-opt {
-      width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
-      border: 3px solid transparent; transition: transform .2s, border-color .2s;
-    }
-    .color-opt:hover { transform: scale(1.1); }
-    .color-opt.selected { border-color: #fff; transform: scale(1.15); box-shadow: 0 0 15px rgba(255,255,255,0.5); }
+  #danger {
+    position: fixed; inset: 0; z-index: 6; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 30%, rgba(120,0,0,.85) 100%);
+    transition: opacity .15s;
+  }
+  #flash {
+    position: fixed; inset: 0; z-index: 20; pointer-events: none; background: #000;
+    opacity: 0; transition: opacity .8s;
+  }
+  #flash.show { opacity: 1; transition: opacity .05s; }
 
-    #multiplayer-ui { display: none; margin-top: 20px; flex-direction: column; align-items: center; }
-    #roomCodeDisplay { font-size: 32px; letter-spacing: 8px; color: #e8c89a; margin: 15px 0; font-weight: bold; font-family: monospace; }
-    
-    #joinInput {
-      background: rgba(0,0,0,.5); border: 1px solid #555; color: white;
-      padding: 10px; font-size: 20px; text-align: center; width: 160px;
-      text-transform: uppercase; letter-spacing: 6px; margin-bottom: 10px; outline: none;
-      font-family: monospace;
-    }
-    #joinInput:focus { border-color: #e8c89a; }
-    #joinError { color: #ff6666; font-size: 14px; margin-top: 15px; display: none; height: 20px; }
-
-    /* --- LIMITE DE JOGADORES --- */
-    #host-options { margin-bottom: 20px; font-size: 14px; color: #e8c89a; }
-    #maxPlayersSelect {
-      background: rgba(0,0,0,.5); border: 1px solid #555; color: white;
-      padding: 5px 10px; font-size: 14px; outline: none; cursor: pointer;
-    }
-
-    #hud {
-      position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
-      z-index: 8; font: 11px system-ui, sans-serif; color: #e8c89a;
-      letter-spacing: 4px; text-transform: uppercase;
-      opacity: 0; transition: opacity 2s; pointer-events: none;
-      display: flex; flex-direction: column; align-items: center; gap: 10px;
-    }
-    #hud.visible { opacity: 0.7; }
-    #status { font-size: 10px; color: #888; font-family: monospace; letter-spacing: 1px;}
-
-    /* --- MINIMAPA --- */
-    #minimap {
-      position: fixed; top: 20px; right: 20px; z-index: 8;
-      width: 150px; height: 150px;
-      background: rgba(10, 8, 12, 0.7);
-      border: 2px solid rgba(232, 200, 154, 0.3);
-      border-radius: 50%;
-      box-shadow: 0 0 15px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.5);
-      display: none;
-    }
-    #minimap.visible { display: block; }
-
-    #joystick {
-      position: fixed; z-index: 14;
-      width: 140px; height: 140px; border-radius: 50%;
-      background: rgba(255,255,255,.05);
-      border: 2px solid rgba(255,255,255,.15);
-      pointer-events: none; display: none;
-    }
-    #joystickKnob {
-      position: absolute; width: 62px; height: 62px; border-radius: 50%;
-      background: rgba(255,255,255,.25); border: 2px solid rgba(255,255,255,.45);
-      top: 50%; left: 50%; margin-left: -31px; margin-top: -31px;
-    }
-
-    #btnSprint {
-      position: fixed; bottom: 22px; right: 22px; z-index: 15;
-      width: 82px; height: 82px; border-radius: 50%;
-      background: rgba(0,0,0,.55); border: 2px solid rgba(255,255,255,.3);
-      color: white; font-size: 32px; cursor: pointer;
-      display: none; align-items: center; justify-content: center;
-      -webkit-tap-highlight-color: transparent; transition: background .15s;
-    }
-    #btnSprint.active { background: rgba(255,170,50,.6); border-color: rgba(255,170,50,.9); }
-
-    @media (hover: none) {
-      #btnSprint { display: flex; }
-      #minimap { width: 120px; height: 120px; top: 15px; right: 15px; }
-    }
-  </style>
+  #joystick {
+    position: fixed; z-index: 14; width: 140px; height: 140px; border-radius: 50%;
+    background: rgba(255,255,255,.05); border: 2px solid rgba(255,255,255,.15);
+    pointer-events: none; display: none;
+  }
+  #joystickKnob {
+    position: absolute; width: 62px; height: 62px; border-radius: 50%;
+    background: rgba(255,255,255,.25); border: 2px solid rgba(255,255,255,.45);
+    top: 50%; left: 50%; margin-left: -31px; margin-top: -31px;
+  }
+  #btnSprint {
+    position: fixed; bottom: 22px; right: 22px; z-index: 15;
+    width: 82px; height: 82px; border-radius: 50%;
+    background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.3);
+    color: #fff; font-size: 30px; cursor: pointer;
+    display: none; align-items: center; justify-content: center;
+    -webkit-tap-highlight-color: transparent; transition: background .15s;
+  }
+  #btnSprint.active { background: rgba(255,255,255,.5); color: #000; }
+  @media (hover: none) { #btnSprint { display: flex; } }
+</style>
 </head>
 <body>
-  <div id="vignette"></div>
 
-  <div id="overlay">
-    <div id="menu-main">
-      <h1>Liminal</h1>
-      <p>Um lugar entre lugares.</p>
-      
-      <div id="color-picker">
-        <div class="color-opt selected" data-color="0x4a9eff" style="background:#4a9eff"></div>
-        <div class="color-opt" data-color="0xff4a4a" style="background:#ff4a4a"></div>
-        <div class="color-opt" data-color="0x4aff4a" style="background:#4aff4a"></div>
-        <div class="color-opt" data-color="0xffea4a" style="background:#ffea4a"></div>
-      </div>
+<div id="flash"></div>
+<div id="danger"></div>
 
-      <button class="menu-btn" id="btnSolo">Jogar Sozinho</button>
-      <button class="menu-btn" id="btnHost">Criar Sala</button>
-      <button class="menu-btn" id="btnJoinShow">Entrar em Sala</button>
-    </div>
+<div id="overlay">
+  <h1>Liminal</h1>
+  <p>Corredores que não terminam.</p>
+  <button class="menu-btn" id="btnStart">Entrar</button>
+  <p style="margin-top:24px; font-size:10px; opacity:.35; letter-spacing:2px;">WASD / setas · Shift para correr</p>
+</div>
 
-    <div id="multiplayer-ui">
-      <div id="host-ui" style="display:none">
-        <div id="host-options">
-          Limite de jogadores:
-          <select id="maxPlayersSelect">
-            <option value="2">2 Jogadores</option>
-            <option value="3">3 Jogadores</option>
-            <option value="4">4 Jogadores (Máx)</option>
-          </select>
-        </div>
-        <p>Compartilhe este código:</p>
-        <div id="roomCodeDisplay">------</div>
-        <p style="font-size:14px; color:#e8c89a; font-weight:bold;" id="hostStatus">Aguardando (1/2)...</p>
-      </div>
-      <div id="join-ui" style="display:none">
-        <p>Digite o código da sala:</p>
-        <input type="text" id="joinInput" maxlength="6" placeholder="XXXXXX" autocomplete="off" spellcheck="false">
-        <br>
-        <button class="menu-btn" id="btnJoinConnect">Conectar</button>
-        <div id="joinError"></div>
-      </div>
-    </div>
-  </div>
+<div id="hud">
+  <div>Nível 1 — Labirinto</div>
+  <div id="dist">—</div>
+</div>
 
-  <div id="hud">
-    <div>Condomínio — Pôr do sol</div>
-    <div id="status">Offline</div>
-  </div>
+<div id="joystick"><div id="joystickKnob"></div></div>
+<button id="btnSprint">🏃</button>
 
-  <canvas id="minimap" width="150" height="150"></canvas>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
 
-  <div id="joystick"><div id="joystickKnob"></div></div>
-  <button id="btnSprint">🏃</button>
+<script type="module">
+import * as THREE from 'three';
 
-  <script src="https://unpkg.com/peerjs@1.5.0/dist/peerjs.min.js"></script>
-  <script type="importmap">
-  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
-  </script>
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
-  <script type="module">
-    import * as THREE from 'three';
+const CELLS   = 21;
+const CELL    = 4.2;
+const WALL_H  = 3.4;
+const WALL_T  = 0.28;
+const PLAYER_R = 0.35;
+const EYE_H   = 1.65;
+const BASE_SPEED = 4.2;
+const SPRINT_MULT = 1.85;
+const CREATURE_SPEED = 2.35;
 
-    const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+scene.fog = new THREE.FogExp2(0x000000, 0.055);
 
-    // ============ SCENE SETUP ============
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x2a2018);
-    scene.fog = new THREE.FogExp2(new THREE.Color(0xe8a468), 0.012);
+const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 200);
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
 
-    const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.1, 800);
-    camera.position.set(0, 1.7, 0);
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setSize(innerWidth, innerHeight);
-    renderer.setPixelRatio(Math.min(devicePixelRatio, isTouch ? 1.5 : 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    document.body.appendChild(renderer.domElement);
-    const canvas = renderer.domElement;
+scene.add(new THREE.AmbientLight(0xffffff, 0.06));
 
-    // Sky Shader
-    const skyGeo = new THREE.SphereGeometry(500, 32, 16);
-    const skyMat = new THREE.ShaderMaterial({
-      side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: {
-        topColor:     { value: new THREE.Color(0x2a3a5a) },
-        midColor:     { value: new THREE.Color(0x8a6a80) },
-        horizonColor: { value: new THREE.Color(0xf0a868) },
-        bottomColor:  { value: new THREE.Color(0x5a4a3a) },
-        sunDir:       { value: new THREE.Vector3(0.6, 0.15, -0.8).normalize() }
-      },
-      vertexShader: `varying vec3 vWorldPos; void main() { vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `
-        uniform vec3 topColor, midColor, horizonColor, bottomColor, sunDir;
-        varying vec3 vWorldPos;
-        void main() {
-          vec3 dir = normalize(vWorldPos);
-          float h = dir.y;
-          vec3 col;
-          if (h > 0.0) {
-            float t = pow(h, 0.55);
-            if (t < 0.5) col = mix(horizonColor, midColor, t * 2.0);
-            else         col = mix(midColor, topColor, (t - 0.5) * 2.0);
-          } else { col = mix(horizonColor, bottomColor, pow(-h, 0.5)); }
-          float sunDot = max(dot(dir, sunDir), 0.0);
-          col += vec3(1.0, 0.9, 0.6) * pow(sunDot, 32.0) * 0.9;
-          col += vec3(1.0, 0.95, 0.8) * pow(sunDot, 500.0) * 2.0;
-          gl_FragColor = vec4(col, 1.0);
-        }
-      `
-    });
-    const sky = new THREE.Mesh(skyGeo, skyMat);
-    sky.renderOrder = -1;
-    scene.add(sky);
+const flashlight = new THREE.SpotLight(0xffffff, 22, 26, Math.PI/6.5, 0.45, 1.2);
+flashlight.castShadow = true;
+flashlight.shadow.mapSize.set(1024, 1024);
+flashlight.shadow.camera.near = 0.5;
+flashlight.shadow.camera.far = 30;
+flashlight.shadow.bias = -0.001;
+scene.add(flashlight);
+scene.add(flashlight.target);
 
-    // Lights
-    const sunDir = new THREE.Vector3(0.6, 0.15, -0.8).normalize();
-    const sunLight = new THREE.DirectionalLight(0xffe0a8, 3.5);
-    sunLight.position.copy(sunDir).multiplyScalar(80);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.set(isTouch?1024:2048, isTouch?1024:2048);
-    const sc = sunLight.shadow.camera;
-    sc.left = -60; sc.right = 60; sc.top = 60; sc.bottom = -60; sc.near = 1; sc.far = 200;
-    sunLight.shadow.bias = -0.0004; sunLight.shadow.normalBias = 0.03;
-    scene.add(sunLight, sunLight.target);
-    scene.add(new THREE.HemisphereLight(0xb0c8e0, 0x504030, 0.8));
-    scene.add(new THREE.AmbientLight(0xf0c890, 0.35));
+const topLight = new THREE.HemisphereLight(0xffffff, 0x000000, 0.12);
+scene.add(topLight);
 
-    // Textures
-    const maxAniso = renderer.capabilities.getMaxAnisotropy();
-    function makeCanvasTex(s, draw) {
-      const c = document.createElement('canvas'); c.width = c.height = s;
-      draw(c.getContext('2d'), s);
-      const t = new THREE.CanvasTexture(c);
-      t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = maxAniso;
-      return t;
-    }
-    const grassTex = makeCanvasTex(512, (ctx, s) => {
-      ctx.fillStyle = '#3a4a2a'; ctx.fillRect(0, 0, s, s);
-      for (let i = 0; i < 30000; i++) {
-        const r = 40 + Math.random() * 40, g = 55 + Math.random() * 50, b = 20 + Math.random() * 25;
-        ctx.fillStyle = `rgba(${r|0},${g|0},${b|0},${0.3 + Math.random() * 0.5})`;
-        ctx.fillRect(Math.random()*s, Math.random()*s, 1, 1 + Math.random()*3);
-      }
-    });
-    grassTex.repeat.set(60, 60);
+function makeNoiseTexture(size, base) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = `rgb(${base},${base},${base})`;
+  ctx.fillRect(0, 0, size, size);
+  const img = ctx.getImageData(0, 0, size, size);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 40;
+    img.data[i]   = Math.max(0, Math.min(255, img.data[i] + n));
+    img.data[i+1] = Math.max(0, Math.min(255, img.data[i+1] + n));
+    img.data[i+2] = Math.max(0, Math.min(255, img.data[i+2] + n));
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(2, 1.2);
+  return t;
+}
+const wallTex = makeNoiseTexture(256, 210);
+const floorTex = makeNoiseTexture(256, 40);
+floorTex.repeat.set(CELLS * 0.5, CELLS * 0.5);
 
-    const wallTex = makeCanvasTex(512, (ctx, s) => {
-      ctx.fillStyle = '#d8d0c0'; ctx.fillRect(0, 0, s, s);
-      for (let i = 0; i < 15000; i++) {
-        const g = Math.random() * 50 - 25;
-        ctx.fillStyle = `rgba(${220+g|0},${212+g|0},${196+g|0},${0.15+Math.random()*0.3})`;
-        ctx.fillRect(Math.random()*s, Math.random()*s, 1+Math.random()*2, 1+Math.random()*2);
-      }
-    });
+const worldSize = CELLS * CELL;
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(worldSize, worldSize),
+  new THREE.MeshStandardMaterial({ map: floorTex, roughness: 1, color: 0xffffff })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
 
-    const roofTex = makeCanvasTex(512, (ctx, s) => {
-      ctx.fillStyle = '#a85838'; ctx.fillRect(0, 0, s, s);
-      const tileH = 24, tileW = 32;
-      for (let row = 0; row < s/tileH + 1; row++) {
-        const offset = (row % 2) * tileW / 2;
-        for (let x = -tileW + offset; x < s + tileW; x += tileW) {
-          const y = row * tileH; const shade = 0.7 + Math.random() * 0.5;
-          const r = 170 * shade, g = 90 * shade, b = 55 * shade;
-          ctx.fillStyle = `rgb(${r|0},${g|0},${b|0})`;
-          ctx.fillRect(x + 1, y, tileW - 2, tileH);
-          ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(x + 1, y, tileW - 2, 2);
-          ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(x + 1, y + tileH - 2, tileW - 2, 2);
-        }
-      }
-    });
+const ceiling = new THREE.Mesh(
+  new THREE.PlaneGeometry(worldSize, worldSize),
+  new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1, side: THREE.BackSide })
+);
+ceiling.rotation.x = Math.PI / 2;
+ceiling.position.y = WALL_H;
+scene.add(ceiling);
 
-    const pavementTex = makeCanvasTex(512, (ctx, s) => {
-      ctx.fillStyle = '#8a8580'; ctx.fillRect(0, 0, s, s);
-      for (let i = 0; i < 20000; i++) {
-        const g = Math.random() * 60 - 30;
-        ctx.fillStyle = `rgba(${138+g|0},${133+g|0},${128+g|0},${0.2+Math.random()*0.4})`;
-        ctx.fillRect(Math.random()*s, Math.random()*s, 1+Math.random()*2, 1+Math.random()*2);
-      }
-    });
+let grid = [];
 
-    // Environment Map
-    const envCanvas = document.createElement('canvas'); envCanvas.width = 512; envCanvas.height = 256;
-    const eCtx = envCanvas.getContext('2d');
-    const eGrad = eCtx.createLinearGradient(0, 0, 0, 256);
-    eGrad.addColorStop(0, '#2a3a5a'); eGrad.addColorStop(0.4, '#8a6a80');
-    eGrad.addColorStop(0.55, '#f0a868'); eGrad.addColorStop(0.65, '#c88a58'); eGrad.addColorStop(1, '#3a2e22');
-    eCtx.fillStyle = eGrad; eCtx.fillRect(0, 0, 512, 256);
-    const envEquirect = new THREE.CanvasTexture(envCanvas);
-    envEquirect.mapping = THREE.EquirectangularReflectionMapping; envEquirect.colorSpace = THREE.SRGBColorSpace;
-    const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromEquirectangular(envEquirect).texture;
-    pmrem.dispose();
+function generateMaze(size) {
+  const g = [];
+  for (let y = 0; y < size; y++) {
+    g[y] = [];
+    for (let x = 0; x < size; x++) g[y][x] = true;
+  }
 
-    // ============ GROUND & GEOMETRY ============
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }));
-    ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+  const stack = [];
+  const startX = 1, startY = 1;
+  g[startY][startX] = false;
+  stack.push([startX, startY]);
 
-    function makeGableRoof(w, h, d) {
-      const hw = w/2, hd = d/2;
-      const slope = Math.sqrt(hw*hw + h*h);
-      const g = new THREE.BufferGeometry();
-      const p = [], uv = [];
-      const s = 0.25; 
-      const flb = [-hw,0,hd], frb = [hw,0,hd], ft = [0,h,hd];
-      const blb = [-hw,0,-hd], brb = [hw,0,-hd], bt = [0,h,-hd];
-      p.push(...flb, ...ft, ...bt, ...flb, ...bt, ...blb); uv.push(0,0, 0,slope*s, d*s,slope*s, 0,0, d*s,slope*s, d*s,0);
-      p.push(...frb, ...brb, ...bt, ...frb, ...bt, ...ft); uv.push(0,0, d*s,0, d*s,slope*s, 0,0, d*s,slope*s, 0,slope*s);
-      p.push(...flb, ...frb, ...ft); uv.push(0,0, w*s,0, w*s*0.5,h*s);
-      p.push(...blb, ...bt, ...brb); uv.push(0,0, w*s*0.5,h*s, w*s,0);
-      g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
-      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-      g.computeVertexNormals();
-      return g;
-    }
+  const dirs = [[0,-2],[2,0],[0,2],[-2,0]];
 
-    const SPACING = 24, GRID = isTouch ? 11 : 15, COUNT = GRID * GRID;
-    const HOUSE_W = 7, HOUSE_D = 10, WALL_H = 3.5, ROOF_H = 2.8, ROOF_OVERLAP = 0.15;
-    const PLAYER_R = 0.4, EYE_H = 1.7, BASE_SPEED = 5.0, SPRINT_MULT = 2.0;
-
-    const dummy = new THREE.Object3D();
-    const col = new THREE.Color();
-    const foundation = new THREE.InstancedMesh(new THREE.BoxGeometry(HOUSE_W+0.4, 0.5, HOUSE_D+0.4), new THREE.MeshStandardMaterial({ color: 0x6a5a4a, roughness: 0.95 }), COUNT);
-    const walls = new THREE.InstancedMesh(new THREE.BoxGeometry(HOUSE_W, WALL_H, HOUSE_D), new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9 }), COUNT);
-    const roof = new THREE.InstancedMesh(makeGableRoof(HOUSE_W+0.8, ROOF_H, HOUSE_D+0.8), new THREE.MeshStandardMaterial({ map: roofTex, roughness: 0.85 }), COUNT);
-    const chimney = new THREE.InstancedMesh(new THREE.BoxGeometry(0.7, 2.2, 0.7), new THREE.MeshStandardMaterial({ color: 0x8a6a58, roughness: 0.95 }), COUNT);
-    const door = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 2.2, 0.1), new THREE.MeshStandardMaterial({ color: 0x3a2418, roughness: 0.7 }), COUNT);
-    const windowFrame = new THREE.InstancedMesh(new THREE.BoxGeometry(1.3, 1.3, 0.08), new THREE.MeshStandardMaterial({ color: 0x4a3a28, roughness: 0.85 }), COUNT*2);
-    const windows = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.0, 1.0), new THREE.MeshStandardMaterial({ color: 0x2a3040, roughness: 0.15, metalness: 0.85, envMapIntensity: 1.5 }), COUNT*2);
-    const driveway = new THREE.InstancedMesh(new THREE.PlaneGeometry(5, 6), new THREE.MeshStandardMaterial({ map: pavementTex, roughness: 0.95 }), COUNT);
-    
-    walls.castShadow = true; walls.receiveShadow = true;
-    roof.castShadow = true; roof.receiveShadow = true; chimney.castShadow = true;
-    foundation.receiveShadow = true; door.receiveShadow = true; windowFrame.receiveShadow = true; windows.receiveShadow = true; driveway.receiveShadow = true;
-    scene.add(foundation, walls, roof, chimney, door, windowFrame, windows, driveway);
-
-    const WALL_BOTTOM = 0.5, WALL_TOP = WALL_BOTTOM + WALL_H, FRONT_Z = HOUSE_D/2 + 0.06, ROOF_Y = WALL_TOP - ROOF_OVERLAP;
-
-    function wallShade(tx, tz) {
-      const h = Math.sin(tx * 12.9898 + tz * 78.233) * 43758.5453;
-      return 0.85 + (h - Math.floor(h)) * 0.2;
-    }
-
-    function updateWorld() {
-      const baseX = Math.round(camera.position.x / SPACING);
-      const baseZ = Math.round(camera.position.z / SPACING);
-      const sx = baseX * SPACING, sz = baseZ * SPACING;
-      const half = Math.floor(GRID/2);
-      let i = 0, wi = 0;
-
-      for (let ix = -half; ix <= half; ix++) {
-        for (let iz = -half; iz <= half; iz++) {
-          const x = sx + ix * SPACING, z = sz + iz * SPACING;
-          const tx = baseX + ix, tz = baseZ + iz;
-          const sh = wallShade(tx, tz);
-
-          dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1);
-          dummy.position.set(x, 0.25, z); dummy.updateMatrix(); foundation.setMatrixAt(i, dummy.matrix);
-          dummy.position.set(x, WALL_BOTTOM + WALL_H/2, z); dummy.updateMatrix(); walls.setMatrixAt(i, dummy.matrix);
-          walls.setColorAt(i, col.setRGB(sh, sh * 0.98, sh * 0.92));
-          dummy.position.set(x, ROOF_Y, z); dummy.updateMatrix(); roof.setMatrixAt(i, dummy.matrix);
-          const rt = 0.85 + Math.random() * 0.3; roof.setColorAt(i, col.setRGB(rt, rt * 0.95, rt * 0.9));
-          dummy.position.set(x + 1.5, ROOF_Y + ROOF_H * 0.4 + 1.1, z - 1.5); dummy.updateMatrix(); chimney.setMatrixAt(i, dummy.matrix);
-          dummy.position.set(x, WALL_BOTTOM + 0.1 + 1.1, z + FRONT_Z); dummy.updateMatrix(); door.setMatrixAt(i, dummy.matrix);
-
-          const winY = WALL_BOTTOM + 2.4;
-          dummy.position.set(x - 2.0, winY, z + FRONT_Z - 0.02); dummy.updateMatrix(); windowFrame.setMatrixAt(wi, dummy.matrix);
-          dummy.position.set(x - 2.0, winY, z + FRONT_Z + 0.04); dummy.updateMatrix(); windows.setMatrixAt(wi++, dummy.matrix);
-          dummy.position.set(x + 2.0, winY, z + FRONT_Z - 0.02); dummy.updateMatrix(); windowFrame.setMatrixAt(wi, dummy.matrix);
-          dummy.position.set(x + 2.0, winY, z + FRONT_Z + 0.04); dummy.updateMatrix(); windows.setMatrixAt(wi++, dummy.matrix);
-          
-          dummy.position.set(x, 0.01, z + HOUSE_D/2 + 3.5); dummy.rotation.set(-Math.PI/2, 0, 0); dummy.updateMatrix(); driveway.setMatrixAt(i, dummy.matrix);
-          dummy.rotation.set(0, 0, 0);
-          i++;
-        }
-      }
-      foundation.instanceMatrix.needsUpdate = true; walls.instanceMatrix.needsUpdate = true;
-      roof.instanceMatrix.needsUpdate = true; chimney.instanceMatrix.needsUpdate = true;
-      door.instanceMatrix.needsUpdate = true; windowFrame.instanceMatrix.needsUpdate = true;
-      windows.instanceMatrix.needsUpdate = true; driveway.instanceMatrix.needsUpdate = true;
-      if (walls.instanceColor) walls.instanceColor.needsUpdate = true;
-      if (roof.instanceColor) roof.instanceColor.needsUpdate = true;
-    }
-
-    const HW = (HOUSE_W + 0.4)/2 + PLAYER_R, HD = (HOUSE_D + 0.4)/2 + PLAYER_R;
-    function collides(x, z) {
-      const hx = Math.round(x / SPACING) * SPACING, hz = Math.round(z / SPACING) * SPACING;
-      return Math.abs(x - hx) < HW && Math.abs(z - hz) < HD;
-    }
-    function tryMove(dx, dz) {
-      const nx = camera.position.x + dx;
-      if (!collides(nx, camera.position.z)) camera.position.x = nx;
-      const nz = camera.position.z + dz;
-      if (!collides(camera.position.x, nz)) camera.position.z = nz;
-    }
-
-    camera.position.set(SPACING/2, EYE_H, SPACING/2);
-    updateWorld();
-
-    // ============ MULTIPLAYER STATE & PLAYERS ============
-    let peer = null;
-    let isMultiplayer = false;
-    let myId = null;
-    let myColor = 0x4a9eff; 
-    
-    const remotePlayers = new Map();
-    let hostConnections = new Map();
-    let maxPlayers = 4;
-
-    function createPlayerMesh(colorHex) {
-      const group = new THREE.Group();
-      const mat = new THREE.MeshStandardMaterial({ color: colorHex, emissive: colorHex, emissiveIntensity: 0.4, roughness: 0.5 });
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.2, 8), mat);
-      body.position.y = 0.6; group.add(body);
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8), mat);
-      head.position.y = 1.45; group.add(head);
-      const light = new THREE.SpotLight(colorHex, 15, 20, Math.PI/5, 0.5, 1.5);
-      light.position.set(0, 1.4, 0); light.target.position.set(0, 0, -1);
-      group.add(light); group.add(light.target);
-      group.visible = false;
-      return { group, light };
-    }
-
-    function addRemotePlayer(id, colorHex, x, z, yaw) {
-      if (remotePlayers.has(id)) removeRemotePlayer(id);
-      const { group, light } = createPlayerMesh(colorHex);
-      scene.add(group);
-      remotePlayers.set(id, { color: colorHex, mesh: group, light: light, targetPos: new THREE.Vector3(x, 0, z), targetYaw: yaw });
-    }
-
-    function removeRemotePlayer(id) {
-      if (remotePlayers.has(id)) {
-        const p = remotePlayers.get(id);
-        scene.remove(p.mesh);
-        remotePlayers.delete(id);
+  while (stack.length) {
+    const [cx, cy] = stack[stack.length - 1];
+    const neighbors = [];
+    for (const [dx, dy] of dirs) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx > 0 && ny > 0 && nx < size-1 && ny < size-1 && g[ny][nx]) {
+        neighbors.push([nx, ny, cx + dx/2, cy + dy/2]);
       }
     }
-
-    // ============ MINIMAP ============
-    const minimapCanvas = document.getElementById('minimap');
-    const mapCtx = minimapCanvas.getContext('2d');
-    const MAP_SIZE = 150, MAP_RADIUS = MAP_SIZE / 2, MAP_VIEW_RANGE = 100, MAP_SCALE = MAP_RADIUS / MAP_VIEW_RANGE;
-
-    function drawMinimap() {
-      if (!started) return;
-      mapCtx.clearRect(0, 0, MAP_SIZE, MAP_SIZE);
-      mapCtx.save();
-      mapCtx.beginPath(); mapCtx.arc(MAP_RADIUS, MAP_RADIUS, MAP_RADIUS, 0, Math.PI * 2); mapCtx.clip();
-      mapCtx.fillStyle = 'rgba(10, 8, 12, 0.7)'; mapCtx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
-
-      const px = camera.position.x, pz = camera.position.z;
-      const baseX = Math.round(px / SPACING), baseZ = Math.round(pz / SPACING);
-      mapCtx.fillStyle = 'rgba(232, 200, 154, 0.15)';
-      for (let ix = -5; ix <= 5; ix++) {
-        for (let iz = -5; iz <= 5; iz++) {
-          const hx = (baseX + ix) * SPACING, hz = (baseZ + iz) * SPACING;
-          const sx = MAP_RADIUS + (hx - px) * MAP_SCALE, sz = MAP_RADIUS + (hz - pz) * MAP_SCALE;
-          mapCtx.fillRect(sx - 3, sz - 4, 6, 8);
-        }
-      }
-
-      remotePlayers.forEach((p) => {
-        const rx = p.targetPos.x, rz = p.targetPos.z;
-        let sx = MAP_RADIUS + (rx - px) * MAP_SCALE, sz = MAP_RADIUS + (rz - pz) * MAP_SCALE;
-        const dist = Math.hypot(sx - MAP_RADIUS, sz - MAP_RADIUS);
-        let isClamped = false;
-        if (dist > MAP_RADIUS - 6) {
-          const angle = Math.atan2(sz - MAP_RADIUS, sx - MAP_RADIUS);
-          sx = MAP_RADIUS + Math.cos(angle) * (MAP_RADIUS - 6); sz = MAP_RADIUS + Math.sin(angle) * (MAP_RADIUS - 6);
-          isClamped = true;
-        }
-        mapCtx.beginPath(); mapCtx.arc(sx, sz, isClamped ? 3 : 4, 0, Math.PI * 2);
-        mapCtx.fillStyle = '#' + p.color.toString(16).padStart(6, '0'); mapCtx.fill();
-        mapCtx.strokeStyle = '#ffffff'; mapCtx.lineWidth = 1; mapCtx.stroke();
-      });
-
-      mapCtx.translate(MAP_RADIUS, MAP_RADIUS); mapCtx.rotate(-yaw);
-      mapCtx.beginPath(); mapCtx.moveTo(0, -6); mapCtx.lineTo(4, 4); mapCtx.lineTo(-4, 4); mapCtx.closePath();
-      mapCtx.fillStyle = '#' + myColor.toString(16).padStart(6, '0'); mapCtx.fill();
-      mapCtx.strokeStyle = '#fff'; mapCtx.stroke();
-      mapCtx.restore();
+    if (neighbors.length === 0) {
+      stack.pop();
+      continue;
     }
+    const [nx, ny, wx, wy] = neighbors[Math.floor(Math.random() * neighbors.length)];
+    g[wy][wx] = false;
+    g[ny][nx] = false;
+    stack.push([nx, ny]);
+  }
 
-    // ============ NETWORKING LOGIC (PEERJS) ============
-    const statusEl = document.getElementById('status');
-    const mpUI = document.getElementById('multiplayer-ui');
-    const hostUI = document.getElementById('host-ui');
-    const joinUI = document.getElementById('join-ui');
-    const roomCodeDisplay = document.getElementById('roomCodeDisplay');
-    const hostStatus = document.getElementById('hostStatus');
-    const joinInput = document.getElementById('joinInput');
-    const joinError = document.getElementById('joinError');
-
-    function generateRoomCode() {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      let code = '';
-      for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-      return code;
+  let extra = Math.floor(size * size * 0.04);
+  while (extra > 0) {
+    const x = 1 + Math.floor(Math.random() * (size - 2));
+    const y = 1 + Math.floor(Math.random() * (size - 2));
+    if (g[y][x] && ((g[y][x-1] === false && g[y][x+1] === false) || (g[y-1][x] === false && g[y+1][x] === false))) {
+      g[y][x] = false;
+      extra--;
     }
+  }
 
-    function startGameForAll() {
-      isMultiplayer = true;
-      document.getElementById('overlay').style.display = 'none';
-      if (!started) requestStart();
-      hostConnections.forEach(conn => { conn.send({ type: 'game-start' }); });
+  return g;
+}
+
+grid = generateMaze(CELLS);
+
+let wallMesh = null;
+
+function buildWalls() {
+  if (wallMesh) {
+    scene.remove(wallMesh);
+    wallMesh.geometry.dispose();
+    wallMesh.material.dispose();
+  }
+
+  let count = 0;
+  for (let y = 0; y < CELLS; y++)
+    for (let x = 0; x < CELLS; x++)
+      if (grid[y][x]) count++;
+
+  const geo = new THREE.BoxGeometry(CELL, WALL_H, CELL);
+  const mat = new THREE.MeshStandardMaterial({ map: wallTex, color: 0xffffff, roughness: 0.95 });
+  wallMesh = new THREE.InstancedMesh(geo, mat, count);
+  wallMesh.castShadow = true;
+  wallMesh.receiveShadow = true;
+
+  const dummy = new THREE.Object3D();
+  const offset = -worldSize / 2 + CELL / 2;
+  let i = 0;
+  for (let y = 0; y < CELLS; y++) {
+    for (let x = 0; x < CELLS; x++) {
+      if (!grid[y][x]) continue;
+      dummy.position.set(offset + x * CELL, WALL_H / 2, offset + y * CELL);
+      dummy.updateMatrix();
+      wallMesh.setMatrixAt(i++, dummy.matrix);
     }
+  }
+  wallMesh.instanceMatrix.needsUpdate = true;
+  scene.add(wallMesh);
+}
 
-    // --- HOST LOGIC ---
-    function initHost() {
-      maxPlayers = parseInt(document.getElementById('maxPlayersSelect').value);
-      const code = generateRoomCode();
-      peer = new Peer(code, { debug: 0 });
+buildWalls();
 
-      peer.on('open', (id) => {
-        myId = id;
-        roomCodeDisplay.textContent = id;
-        hostUI.style.display = 'block';
-        hostStatus.textContent = `Aguardando jogadores (1/${maxPlayers})...`;
-        hostStatus.style.color = '#e8c89a';
-        statusEl.textContent = `Hospedando: ${id} (1/${maxPlayers})`;
-        statusEl.style.color = '#4aff8a';
-      });
+const offset = -worldSize / 2 + CELL / 2;
 
-      peer.on('error', (err) => {
-        if (err.type === 'unavailable-id') { peer.destroy(); initHost(); }
-      });
+function isWallCell(cx, cz) {
+  if (cx < 0 || cz < 0 || cx >= CELLS || cz >= CELLS) return true;
+  return grid[cz][cx];
+}
 
-      peer.on('connection', (c) => {
-        // Verifica se a sala já está cheia antes de aceitar
-        if (hostConnections.size + 1 >= maxPlayers) {
-          c.on('open', () => { c.send({ type: 'error', msg: 'Sala cheia' }); setTimeout(() => c.close(), 100); });
-          return;
-        }
+function worldToCell(wx, wz) {
+  return [Math.round((wx - offset) / CELL), Math.round((wz - offset) / CELL)];
+}
 
-        hostConnections.set(c.peer, c);
-        
-        // Atualiza a UI do Host
-        const total = hostConnections.size + 1;
-        hostStatus.textContent = `Aguardando jogadores (${total}/${maxPlayers})...`;
-        statusEl.textContent = `Hospedando: ${myId} (${total}/${maxPlayers})`;
-
-        c.on('open', () => {
-          // Quando o jogador conecta de fato, verifica se bateu o limite
-          if (hostConnections.size + 1 === maxPlayers) {
-            hostStatus.textContent = `Sala cheia! Iniciando...`;
-            hostStatus.style.color = '#4aff8a';
-            setTimeout(startGameForAll, 1200); // Pequeno delay para leitura
-          }
-        });
-
-        c.on('data', (data) => {
-          if (data.type === 'join') {
-            addRemotePlayer(c.peer, data.color, data.x, data.z, data.yaw);
-            const roster = [];
-            roster.push({ id: myId, color: myColor, x: camera.position.x, z: camera.position.z, yaw: yaw });
-            hostConnections.forEach((conn, id) => {
-              if (id !== c.peer && remotePlayers.has(id)) {
-                const p = remotePlayers.get(id);
-                roster.push({ id, color: p.color, x: p.targetPos.x, z: p.targetPos.z, yaw: p.targetYaw });
-              }
-            });
-            c.send({ type: 'roster', players: roster });
-            
-            hostConnections.forEach((conn, id) => {
-              if (id !== c.peer) conn.send({ type: 'player-joined', id: c.peer, color: data.color, x: data.x, z: data.z, yaw: data.yaw });
-            });
-          } 
-          else if (data.type === 'state') {
-            if (remotePlayers.has(c.peer)) {
-              const p = remotePlayers.get(c.peer);
-              p.targetPos.set(data.x, 0, data.z);
-              p.targetYaw = data.yaw;
-            }
-            hostConnections.forEach((conn, id) => {
-              if (id !== c.peer) conn.send({ type: 'state', id: c.peer, x: data.x, z: data.z, yaw: data.yaw });
-            });
-          }
-        });
-
-        c.on('close', () => {
-          hostConnections.delete(c.peer);
-          removeRemotePlayer(c.peer);
-          const totalNow = hostConnections.size + 1;
-          hostStatus.textContent = `Aguardando jogadores (${totalNow}/${maxPlayers})...`;
-          hostStatus.style.color = '#e8c89a';
-          statusEl.textContent = `Hospedando: ${myId} (${totalNow}/${maxPlayers})`;
-          hostConnections.forEach(conn => conn.send({ type: 'player-left', id: c.peer }));
-        });
-      });
-    }
-
-    // --- CLIENT LOGIC ---
-    function joinRoom(code) {
-      peer = new Peer({ debug: 0 });
-      let hostConn = null;
-
-      peer.on('open', (id) => {
-        myId = id;
-        hostConn = peer.connect(code.toUpperCase());
-        
-        hostConn.on('open', () => {
-          hostConn.send({ type: 'join', color: myColor, x: camera.position.x, z: camera.position.z, yaw: yaw });
-        });
-
-        hostConn.on('data', (data) => {
-          if (data.type === 'error') {
-            joinError.style.display = 'block';
-            joinError.textContent = data.msg;
-            setTimeout(() => { peer.destroy(); location.reload(); }, 2000);
-            return;
-          }
-
-          if (data.type === 'roster') {
-            data.players.forEach(p => { if (p.id !== myId) addRemotePlayer(p.id, p.color, p.x, p.z, p.yaw); });
-            isMultiplayer = true;
-            // Cliente fica no lobby aguardando o Host
-            document.getElementById('btnJoinConnect').style.display = 'none';
-            joinInput.disabled = true;
-            joinError.style.display = 'block';
-            joinError.style.color = '#e8c89a';
-            joinError.textContent = 'Conectado! Aguardando o host iniciar...';
-          }
-          else if (data.type === 'game-start') {
-            document.getElementById('overlay').style.display = 'none';
-            if (!started) requestStart();
-          }
-          else if (data.type === 'player-joined') {
-            addRemotePlayer(data.id, data.color, data.x, data.z, data.yaw);
-          }
-          else if (data.type === 'state') {
-            if (data.id !== myId && remotePlayers.has(data.id)) {
-              const p = remotePlayers.get(data.id);
-              p.targetPos.set(data.x, 0, data.z);
-              p.targetYaw = data.yaw;
-            }
-          }
-          else if (data.type === 'player-left') {
-            removeRemotePlayer(data.id);
-          }
-        });
-
-        hostConn.on('close', () => {
-          statusEl.textContent = 'Desconectado';
-          statusEl.style.color = '#ff6666';
-          remotePlayers.forEach(p => scene.remove(p.mesh));
-          remotePlayers.clear();
-        });
-      });
-
-      peer.on('error', (err) => {
-        joinInput.disabled = false;
-        joinError.style.display = 'block';
-        joinError.style.color = '#ff6666';
-        joinError.textContent = 'Sala não encontrada.';
-      });
-    }
-
-    // ============ UI LOGIC ============
-    document.querySelectorAll('.color-opt').forEach(el => {
-      el.addEventListener('click', () => {
-        document.querySelectorAll('.color-opt').forEach(e => e.classList.remove('selected'));
-        el.classList.add('selected');
-        myColor = parseInt(el.dataset.color);
-      });
-    });
-
-    document.getElementById('btnSolo').addEventListener('click', () => {
-      document.getElementById('overlay').style.display = 'none';
-      requestStart();
-    });
-
-    document.getElementById('btnHost').addEventListener('click', () => {
-      document.getElementById('menu-main').style.display = 'none';
-      mpUI.style.display = 'flex';
-      initHost();
-    });
-
-    document.getElementById('btnJoinShow').addEventListener('click', () => {
-      document.getElementById('menu-main').style.display = 'none';
-      mpUI.style.display = 'flex';
-      joinUI.style.display = 'block';
-    });
-
-    document.getElementById('btnJoinConnect').addEventListener('click', () => {
-      const code = joinInput.value.trim().toUpperCase();
-      if (code.length !== 6) {
-        joinError.style.display = 'block';
-        joinError.textContent = 'O código deve ter 6 caracteres.';
-        return;
-      }
-      joinInput.disabled = true;
-      joinError.style.display = 'none';
-      joinRoom(code);
-    });
-
-    // ============ INPUT ============
-    let yaw = 0, pitch = 0;
-    let started = false, locked = false, dragging = false, dragMode = false;
-    let mobileSprint = false;
-    const keys = {};
-
-    const overlay = document.getElementById('overlay');
-    const joystick = document.getElementById('joystick');
-    const joystickKnob = document.getElementById('joystickKnob');
-    const btnSprint = document.getElementById('btnSprint');
-    const hud = document.getElementById('hud');
-    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-
-    function requestStart() {
-      if (started) return;
-      started = true;
-      hud.classList.add('visible');
-      minimapCanvas.classList.add('visible');
-      if (!isTouch) {
-        const p = canvas.requestPointerLock?.();
-        if (p && p.catch) p.catch(() => { dragMode = true; });
+function resolveCollision(pos) {
+  const [cx, cz] = worldToCell(pos.x, pos.z);
+  for (let dz = -1; dz <= 1; dz++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const gx = cx + dx, gz = cz + dz;
+      if (!isWallCell(gx, gz)) continue;
+      const wx = offset + gx * CELL;
+      const wz = offset + gz * CELL;
+      const half = CELL / 2 + PLAYER_R;
+      const ddx = pos.x - wx;
+      const ddz = pos.z - wz;
+      if (Math.abs(ddx) < half && Math.abs(ddz) < half) {
+        const penX = half - Math.abs(ddx);
+        const penZ = half - Math.abs(ddz);
+        if (penX < penZ) pos.x += Math.sign(ddx || 1) * penX;
+        else             pos.z += Math.sign(ddz || 1) * penZ;
       }
     }
+  }
+}
 
-    document.addEventListener('pointerlockchange', () => { locked = document.pointerLockElement === canvas; });
-    document.addEventListener('pointerlockerror', () => { dragMode = true; });
-    document.addEventListener('mousemove', (e) => {
-      if (isTouch) return;
-      if (locked) { yaw -= e.movementX * 0.002; pitch -= e.movementY * 0.002; }
-      else if (dragMode && dragging) { yaw -= e.movementX * 0.003; pitch -= e.movementY * 0.003; }
-      pitch = Math.max(-Math.PI/2 + 0.05, Math.min(Math.PI/2 - 0.05, pitch));
-    });
-    canvas.addEventListener('mousedown', () => { if (dragMode && !locked) dragging = true; });
-    addEventListener('mouseup', () => { dragging = false; });
-    addEventListener('keydown', (e) => { keys[e.code] = true; });
-    addEventListener('keyup', (e) => { keys[e.code] = false; });
+function findPath(startCell, goalCell) {
+  const [sx, sz] = startCell;
+  const [gx, gz] = goalCell;
+  if (sx === gx && sz === gz) return [];
 
-    // Touch
-    let touchMoveId = null, touchMoveOrigin = null, touchMoveDelta = {x: 0, y: 0};
-    let touchLookId = null, touchLookLast = null;
-    const JOYSTICK_MAX = 55;
+  const key = (x, z) => z * CELLS + x;
+  const open = [{ x: sx, z: sz, g: 0, f: 0, parent: null }];
+  const openMap = new Map();
+  const closed = new Set();
+  openMap.set(key(sx, sz), open[0]);
 
-    function positionJoystick(x, y) { joystick.style.left = (x - 70) + 'px'; joystick.style.top = (y - 70) + 'px'; joystick.style.display = 'block'; setKnob(0, 0); }
-    function setKnob(dx, dy) { const d = Math.hypot(dx, dy); let kx = dx, ky = dy; if (d > JOYSTICK_MAX) { kx = (dx / d) * JOYSTICK_MAX; ky = (dy / d) * JOYSTICK_MAX; } joystickKnob.style.transform = `translate(${kx}px, ${ky}px)`; }
-    function hideJoystick() { joystick.style.display = 'none'; }
+  const h = (x, z) => Math.abs(x - gx) + Math.abs(z - gz);
 
-    function onTouchStart(e) {
-      if (!started) return;
-      for (const t of e.changedTouches) {
-        if (t.clientX < innerWidth / 2) {
-          if (touchMoveId === null) { touchMoveId = t.identifier; touchMoveOrigin = { x: t.clientX, y: t.clientY }; touchMoveDelta = { x: 0, y: 0 }; positionJoystick(t.clientX, t.clientY); }
-        } else if (touchLookId === null) { touchLookId = t.identifier; touchLookLast = { x: t.clientX, y: t.clientY }; }
+  while (open.length) {
+    let bestIdx = 0;
+    for (let i = 1; i < open.length; i++) if (open[i].f < open[bestIdx].f) bestIdx = i;
+    const current = open.splice(bestIdx, 1)[0];
+    openMap.delete(key(current.x, current.z));
+
+    if (current.x === gx && current.z === gz) {
+      const path = [];
+      let n = current;
+      while (n && n.parent) { path.push([n.x, n.z]); n = n.parent; }
+      return path.reverse();
+    }
+
+    closed.add(key(current.x, current.z));
+
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const [dx, dz] of dirs) {
+      const nx = current.x + dx, nz = current.z + dz;
+      if (isWallCell(nx, nz)) continue;
+      const k = key(nx, nz);
+      if (closed.has(k)) continue;
+      const g = current.g + 1;
+      const existing = openMap.get(k);
+      if (existing && g >= existing.g) continue;
+      const node = { x: nx, z: nz, g, f: g + h(nx, nz), parent: current };
+      if (existing) {
+        existing.g = g; existing.f = node.f; existing.parent = current;
+      } else {
+        open.push(node);
+        openMap.set(k, node);
       }
     }
-    function onTouchMove(e) {
-      if (!started) return; e.preventDefault();
-      for (const t of e.changedTouches) {
-        if (t.identifier === touchMoveId) {
-          touchMoveDelta.x = t.clientX - touchMoveOrigin.x; touchMoveDelta.y = t.clientY - touchMoveOrigin.y; setKnob(touchMoveDelta.x, touchMoveDelta.y);
-        } else if (t.identifier === touchLookId) {
-          const dx = t.clientX - touchLookLast.x, dy = t.clientY - touchLookLast.y;
-          yaw -= dx * 0.005; pitch -= dy * 0.005; pitch = Math.max(-Math.PI/2 + 0.05, Math.min(Math.PI/2 - 0.05, pitch)); touchLookLast = { x: t.clientX, y: t.clientY };
-        }
+  }
+  return [];
+}
+
+const creature = new THREE.Group();
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 1 });
+const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 1.6, 4, 8), bodyMat);
+body.position.y = 1.1;
+body.castShadow = true;
+creature.add(body);
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 10, 8), bodyMat);
+head.position.y = 2.15;
+head.castShadow = true;
+creature.add(head);
+const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 6), eyeMat);
+eyeL.position.set(-0.09, 2.18, -0.22);
+const eyeR = eyeL.clone(); eyeR.position.x = 0.09;
+creature.add(eyeL, eyeR);
+const armGeo = new THREE.CapsuleGeometry(0.06, 1.1, 3, 6);
+const armL = new THREE.Mesh(armGeo, bodyMat);
+armL.position.set(-0.42, 1.15, 0); armL.rotation.z = 0.15;
+const armR = new THREE.Mesh(armGeo, bodyMat);
+armR.position.set(0.42, 1.15, 0); armR.rotation.z = -0.15;
+creature.add(armL, armR);
+
+scene.add(creature);
+
+const playerStart = new THREE.Vector3(offset + CELL, EYE_H, offset + CELL);
+const player = playerStart.clone();
+
+function findFarCell() {
+  let best = null, bestD = -1;
+  for (let y = 1; y < CELLS - 1; y++) {
+    for (let x = 1; x < CELLS - 1; x++) {
+      if (grid[y][x]) continue;
+      const wx = offset + x * CELL, wz = offset + y * CELL;
+      const d = (wx - player.x) ** 2 + (wz - player.z) ** 2;
+      if (d > bestD) { bestD = d; best = [x, y]; }
+    }
+  }
+  return best;
+}
+
+let creaturePos = new THREE.Vector3();
+let creatureCell = null;
+let path = [];
+let pathTimer = 0;
+let creatureActive = false;
+
+function respawnCreature() {
+  const cell = findFarCell();
+  creatureCell = cell;
+  creaturePos.set(offset + cell[0] * CELL, 0, offset + cell[1] * CELL);
+  creature.position.copy(creaturePos);
+  creature.visible = true;
+  path = [];
+}
+
+respawnCreature();
+creature.visible = false;
+
+let audioCtx = null;
+let creatureOsc = null, creatureGain = null, creatureFilter = null;
+let noiseSource = null, noiseGain = null, noiseFilter = null;
+let heartbeatTimer = 0;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  creatureOsc = audioCtx.createOscillator();
+  creatureOsc.type = 'sawtooth';
+  creatureOsc.frequency.value = 42;
+
+  const lfo = audioCtx.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.value = 0.7;
+  const lfoGain = audioCtx.createGain();
+  lfoGain.gain.value = 8;
+  lfo.connect(lfoGain).connect(creatureOsc.frequency);
+  lfo.start();
+
+  creatureFilter = audioCtx.createBiquadFilter();
+  creatureFilter.type = 'lowpass';
+  creatureFilter.frequency.value = 220;
+  creatureFilter.Q.value = 4;
+
+  creatureGain = audioCtx.createGain();
+  creatureGain.gain.value = 0;
+
+  creatureOsc.connect(creatureFilter).connect(creatureGain).connect(audioCtx.destination);
+  creatureOsc.start();
+
+  const bufferSize = audioCtx.sampleRate * 2;
+  const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+  noiseSource = audioCtx.createBufferSource();
+  noiseSource.buffer = noiseBuffer;
+  noiseSource.loop = true;
+
+  noiseFilter = audioCtx.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = 900;
+  noiseFilter.Q.value = 0.6;
+
+  noiseGain = audioCtx.createGain();
+  noiseGain.gain.value = 0.008;
+
+  noiseSource.connect(noiseFilter).connect(noiseGain).connect(audioCtx.destination);
+  noiseSource.start();
+}
+
+function playHeartbeat(volume) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  [0, 0.16].forEach((offset, i) => {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(60, t + offset);
+    osc.frequency.exponentialRampToValueAtTime(30, t + offset + 0.18);
+    g.gain.setValueAtTime(0, t + offset);
+    g.gain.linearRampToValueAtTime(volume, t + offset + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, t + offset + 0.25);
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start(t + offset);
+    osc.stop(t + offset + 0.3);
+  });
+}
+
+function playScream() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(800, t);
+  osc.frequency.exponentialRampToValueAtTime(120, t + 0.9);
+  filter.type = 'bandpass';
+  filter.frequency.value = 600;
+  filter.Q.value = 2;
+  g.gain.setValueAtTime(0.3, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+  osc.connect(filter).connect(g).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 1.0);
+}
+
+const keys = {};
+addEventListener('keydown', e => { keys[e.code] = true; });
+addEventListener('keyup',   e => { keys[e.code] = false; });
+
+const joyEl = document.getElementById('joystick');
+const knobEl = document.getElementById('joystickKnob');
+let joyActive = false, joyId = null, joyStart = { x:0, y:0 }, joyVec = { x:0, y:0 };
+let sprintTouch = false;
+
+function setupTouchControls() {
+  if (!isTouch) return;
+  const btnSprint = document.getElementById('btnSprint');
+  btnSprint.addEventListener('touchstart', e => { e.preventDefault(); sprintTouch = true; btnSprint.classList.add('active'); });
+  btnSprint.addEventListener('touchend',   e => { e.preventDefault(); sprintTouch = false; btnSprint.classList.remove('active'); });
+
+  canvas.addEventListener('touchstart', e => {
+    for (const t of e.changedTouches) {
+      if (t.clientX < innerWidth * 0.5) {
+        joyActive = true; joyId = t.identifier;
+        joyStart.x = t.clientX; joyStart.y = t.clientY;
+        joyEl.style.display = 'block';
+        joyEl.style.left = (t.clientX - 70) + 'px';
+        joyEl.style.top  = (t.clientY - 70) + 'px';
+        knobEl.style.transform = 'translate(0,0)';
+        break;
       }
     }
-    function onTouchEnd(e) {
-      for (const t of e.changedTouches) {
-        if (t.identifier === touchMoveId) { touchMoveId = null; touchMoveOrigin = null; touchMoveDelta = { x: 0, y: 0 }; hideJoystick(); }
-        if (t.identifier === touchLookId) { touchLookId = null; touchLookLast = null; }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', e => {
+    for (const t of e.changedTouches) {
+      if (t.identifier === joyId) {
+        const dx = t.clientX - joyStart.x;
+        const dy = t.clientY - joyStart.y;
+        const max = 55;
+        const len = Math.hypot(dx, dy);
+        const cl = Math.min(len, max);
+        const nx = len ? dx / len : 0;
+        const ny = len ? dy / len : 0;
+        joyVec.x = nx * (cl / max);
+        joyVec.y = ny * (cl / max);
+        knobEl.style.transform = `translate(${nx*cl}px, ${ny*cl}px)`;
+        break;
       }
     }
-    canvas.addEventListener('touchstart', onTouchStart, { passive: true });
-    canvas.addEventListener('touchmove', onTouchMove, { passive: false });
-    canvas.addEventListener('touchend', onTouchEnd);
-    canvas.addEventListener('touchcancel', onTouchEnd);
+  }, { passive: false });
 
-    btnSprint.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); mobileSprint = true; btnSprint.classList.add('active'); }, { passive: false });
-    btnSprint.addEventListener('touchend', (e) => { e.preventDefault(); e.stopPropagation(); mobileSprint = false; btnSprint.classList.remove('active'); }, { passive: false });
-
-    // ============ LOOP ============
-    const clock = new THREE.Clock();
-    const velocity = new THREE.Vector3(), targetVel = new THREE.Vector3(), forward = new THREE.Vector3(), right = new THREE.Vector3();
-    let lastCell = '', bobPhase = 0, breathPhase = 0, networkTimer = 0;
-
-    function animate() {
-      requestAnimationFrame(animate);
-      const dt = Math.min(clock.getDelta(), 0.05);
-
-      if (started) {
-        let mx = 0, mz = 0;
-        if (keys['KeyW']) mz -= 1; if (keys['KeyS']) mz += 1;
-        if (keys['KeyA']) mx -= 1; if (keys['KeyD']) mx += 1;
-
-        if (touchMoveId !== null) {
-          const jx = touchMoveDelta.x / JOYSTICK_MAX, jy = touchMoveDelta.y / JOYSTICK_MAX, jm = Math.hypot(jx, jy);
-          if (jm > 1) { mx += jx / jm; mz += jy / jm; } else { mx += jx; mz += jy; }
-        }
-
-        const mag = Math.hypot(mx, mz);
-        const moving = mag > 0.1;
-        const sprinting = (keys['ShiftLeft'] || keys['ShiftRight'] || mobileSprint) && moving;
-        const speed = sprinting ? BASE_SPEED * SPRINT_MULT : BASE_SPEED;
-        if (mag > 1) { mx /= mag; mz /= mag; }
-
-        forward.set(-Math.sin(yaw), 0, -Math.cos(yaw)); right.set(Math.cos(yaw), 0, -Math.sin(yaw));
-        targetVel.set(0, 0, 0);
-        if (moving) { targetVel.addScaledVector(forward, -mz * speed); targetVel.addScaledVector(right, mx * speed); }
-
-        velocity.lerp(targetVel, 1 - Math.exp(-10 * dt));
-        tryMove(velocity.x * dt, velocity.z * dt);
-
-        if (velocity.length() > 0.5) {
-          bobPhase += dt * (sprinting ? 12 : 8);
-          camera.position.y = EYE_H + Math.sin(bobPhase) * (sprinting ? 0.05 : 0.03);
-        } else {
-          breathPhase += dt * 1.4;
-          camera.position.y += (EYE_H + Math.sin(breathPhase) * 0.01 - camera.position.y) * Math.min(1, dt * 4);
-        }
-
-        const cell = `${Math.round(camera.position.x / SPACING)},${Math.round(camera.position.z / SPACING)}`;
-        if (cell !== lastCell) { lastCell = cell; updateWorld(); }
-
-        sunLight.position.set(camera.position.x + sunDir.x * 80, sunDir.y * 80, camera.position.z + sunDir.z * 80);
-        sunLight.target.position.set(camera.position.x, 0, camera.position.z);
-        sunLight.target.updateMatrixWorld();
-
-        // REDE
-        networkTimer += dt;
-        if (networkTimer > 0.05) {
-          networkTimer = 0;
-          
-          if (isMultiplayer) {
-            if (myId === peer?.id && hostConnections.size > 0) {
-              hostConnections.forEach(c => {
-                if (c.open) c.send({ type: 'state', id: myId, x: camera.position.x, z: camera.position.z, yaw: yaw });
-              });
-            } else if (peer) {
-              const conn = peer.connections[Object.keys(peer.connections)[0]]?.[0];
-              if (conn && conn.open) conn.send({ type: 'state', x: camera.position.x, z: camera.position.z, yaw: yaw });
-            }
-          }
-        }
-
-        // LERP DOS JOGADORES REMOTOS
-        remotePlayers.forEach((p) => {
-          p.mesh.position.lerp(p.targetPos, 1 - Math.exp(-15 * dt));
-          p.mesh.rotation.y += (p.targetYaw - p.mesh.rotation.y) * Math.min(1, dt * 15);
-          p.mesh.visible = true;
-        });
-
-        drawMinimap();
+  canvas.addEventListener('touchend', e => {
+    for (const t of e.changedTouches) {
+      if (t.identifier === joyId) {
+        joyActive = false; joyId = null; joyVec.x = 0; joyVec.y = 0;
+        joyEl.style.display = 'none';
+        break;
       }
-
-      euler.set(pitch, yaw, 0, 'YXZ'); camera.quaternion.setFromEuler(euler);
-      sky.position.copy(camera.position);
-      renderer.render(scene, camera);
     }
-    animate();
+  }, { passive: false });
+}
+setupTouchControls();
 
-    addEventListener('resize', () => {
-      camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
-    });
-  </script>
-</body>
-</html>
+let gameActive = false;
+let lastT = performance.now();
+let bobPhase = 0;
+let yaw = 0;
+
+const hud = document.getElementById('hud');
+const distEl = document.getElementById('dist');
+const dangerEl = document.getElementById('danger');
+const flashEl = document.getElementById('flash');
+
+document.getElementById('btnStart').addEventListener('click', () => {
+  document.getElementById('overlay').style.display = 'none';
+  hud.classList.add('visible');
+  initAudio();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  gameActive = true;
+  creature.visible = true;
+});
+
+let pointerLocked = false;
+canvas.addEventListener('click', () => {
+  if (!isTouch && gameActive && !pointerLocked) {
+    canvas.requestPointerLock?.();
+  }
+});
+document.addEventListener('pointerlockchange', () => {
+  pointerLocked = document.pointerLockElement === canvas;
+});
+document.addEventListener('mousemove', e => {
+  if (pointerLocked) yaw -= e.movementX * 0.0022;
+});
+
+function update(dt) {
+  let mx = 0, mz = 0;
+  if (keys['KeyW'] || keys['ArrowUp'])    mz -= 1;
+  if (keys['KeyS'] || keys['ArrowDown'])  mz += 1;
+  if (keys['KeyA'] || keys['ArrowLeft'])  mx -= 1;
+  if (keys['KeyD'] || keys['ArrowRight']) mx += 1;
+
+  if (joyActive) { mx += joyVec.x; mz += joyVec.y; }
+
+  const len = Math.hypot(mx, mz);
+  if (len > 1) { mx /= len; mz /= len; }
+
+  const sprinting = keys['ShiftLeft'] || keys['ShiftRight'] || sprintTouch;
+  const speed = BASE_SPEED * (sprinting ? SPRINT_MULT : 1);
+
+  const fwdX = Math.sin(yaw), fwdZ = Math.cos(yaw);
+  const rightX = Math.cos(yaw), rightZ = -Math.sin(yaw);
+
+  const dx = (mx * rightX + (-mz) * fwdX) * speed * dt;
+  const dz = (mx * rightZ + (-mz) * fwdZ) * speed * dt;
+
+  player.x += dx;
+  player.z += dz;
+  resolveCollision(player);
+
+  const moving = len > 0.1;
+  if (moving) bobPhase += dt * (sprinting ? 14 : 9);
+  
